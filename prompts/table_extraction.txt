@@ -1,0 +1,137 @@
+Generate four Python 3 functions which each extract one of the four data tables from the HTML document "data/Models overview - Anthropic.html" in this repo.  Use lxml and XPath to select the tables, extract their row and column labels and table cells, and convert them into dicts.
+
+1. The table labeled 'Model names' will be converted to a dict with the following format, where the changing values are stubbed out using "<...>" placeholder syntax:
+
+ANTHROPIC_MODEL_MAP = {
+    "<model name>": {
+        "anthropic": "<claude model tag>",
+        "aws_bedrock": "<aws bedrock model tag>",
+        "gcp_vertex_ai": "<google gcp model tag>",
+    },
+    {...}
+}
+
+For example:
+
+ANTHROPIC_MODEL_TAGS = {
+    "Claude 4 Sonnet": {
+        "anthropic": "claude-sonnet-4-20250514",
+        "aws_bedrock": "anthropic.claude-",
+        "gcp_vertex_ai": "claude-sonnet-4@20250514",
+    },
+    "Claude 4 Sonnet": {
+        "anthropic": "claude-sonnet-4-20250514",
+        "aws_bedrock": "anthropic.claude-",
+        "gcp_vertex_ai": "claude-sonnet-4@20250514",
+    },
+    "Claude 3.7 Sonnet": {
+        "anthropic": "claude-3-7-sonnet-20250219",
+        "aws_bedrock": "anthropic.claude-3-7-sonnet-20250219-v1:0",
+        "gcp_vertex_ai": "claude-3-7-sonnet@20250219",
+    },
+    ...
+}
+
+2. The table labled 'Model aliases' will be converted to a dict with the following format, following the convention described in #1:
+
+ANTHROPIC_MODEL_TAG_ALIASES = {
+    "Claude Opus 4": {
+        "alias": "aliasclaude-opus-4-0",
+        "model_id": "claude-opus-4-20250514"
+    },
+    ...
+}
+
+ANTHROPIC_MODEL_TAG_ALIASES = {
+    "<model name>": {
+        "alias": "<model alias>",
+        "model_id": "<model id/tag>"
+    },
+    ...
+}
+
+ANTHROPIC_MODEL_TAG_ALIASES = {
+    "Claude Opus 4": {
+        "alias": "aliasclaude-opus-4-0",
+        "model_id": "claude-opus-4-20250514"
+    },
+    "Claude Sonnet 4": {
+        "alias": "claude-sonnet-4-0",
+        "model_id": "claude-sonnet-4-20250514"
+    },
+    ...
+}
+
+3. The table 'Model comparison table' will be converted to a dict with the following format, as above:
+
+ANTHROPIC_MODEL_FACTS = {
+    "<model name>": {
+        "Description": "<description>",
+        "Strengths": "<strengths>",
+        "Multilingual": <boolean>,
+        "Vision": <boolean>,
+        "Extended thinking": <boolean>,
+        "Priority Tier": <boolean>,
+        "API model name": "<model id>",
+        "Comparative latency": "<latency>",
+        "Context window": <context window as integer>,
+        "Max output": <max output as integer>,
+        "Training data cut-off": <training data cut-off date as datetime,
+    },
+    ...
+}
+
+For example:
+ANTHROPIC_MODEL_FACTS = {
+    "Claude Opus 4	": {
+        "Description": "Our most capable model",
+        "Strengths": "Highest level of intelligence and capability",
+        "Multilingual": true,
+        "Vision": true,
+        "Extended thinking": true,
+        "Priority Tier": true,
+        "API model name": "claude-opus-4-20250514",
+        "Comparative latency": "Moderately Fast",
+        "Context window": 200000,
+        "Max output": 32000,
+        "Training data cut-off": datetime.datetime(2025, 3, 31),
+    },
+    ...
+}
+
+3. The table 'Model pricing' will be converted to a dict with the following format, as above
+
+ANTHROPIC_MODEL_PRICING_MTOK = {
+    "<model name>": {
+        "Base Input Tokens": "<base input tokens as float string>",
+        "Cache Writes 5m": "<5m cache writes as float string>",
+        "Cache Writes 1h": "<1h Cache Writes as float string>",
+        "Cache Hits": "<cache hits and refreshes as float string>",
+        "Output Tokens": "<output tokens as float string>",
+    },
+    ...
+}
+
+For example:
+
+ANTHROPIC_MODEL_PRICING_MTOK = {
+    "Claude 4 Opus": {
+        "Base Input Tokens": "15.00",
+        "Cache Writes 5m": "18.75",
+        "Cache Writes 1h": "30.00",
+        "Cache Hits": "1.50",
+        "Output Tokens": "75.00",
+    },
+    "Claude 4 Sonnet": {
+        "Base Input Tokens": "3.00",
+        "Cache Writes 5m": "3.75",
+        "Cache Writes 1h": "6.00",
+        "Cache Hits": "0.30",
+        "Output Tokens": "15.00"
+    },
+    ...
+}
+
+
+
+The growth of personal networks through Signal resistance groups is a good project
