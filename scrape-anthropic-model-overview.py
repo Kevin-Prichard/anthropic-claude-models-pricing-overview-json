@@ -19,6 +19,13 @@ TABLE_SEL = ("//{title_tag}[child::span[normalize-space()='{model_name}']]"
 NUMBER_RX = regex.compile(r"\D*(?<number>[0-9]*\.?[0-9]+)?\D*")
 ANTH_DATE_RX = regex.compile(r"^.*?(?P<date>\w+\s\d{4}).*?$")
 MODEL_ID_RX = regex.compile(r"^(?P<model_id>\S+).*")
+MODEL_TAG_PUBLISH_DATE_RX = regex.compile(
+    r".*?\D(:?(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2}))$")
+MODEL_TAG_PARTS_RX = regex.compile(
+    r"^(?P<family>\w+)\s+"
+    r"(?P<branch>\w+)\s+"
+    r"(?P<version>[0-9.]+)"
+)
 
 
 COMP_CONVERSIONS = {
@@ -42,8 +49,8 @@ TABLE_IDENTIFIERS = {
         "PYTHON": "model_aliases",
     },
     "comparison": {
-        "JSON": "model_comparison",
-        "PYTHON": "model_comparison",
+        "JSON": "model_facts",
+        "PYTHON": "model_facts",
     },
     "pricing": {
         "JSON": "model_pricing",
@@ -73,6 +80,14 @@ class KeyCase(Enum):
         return self.value
 
 
+class TrainingOrPublishDate(Enum):
+    TRAINING = "training"
+    PUBLISHED = "published"
+
+    def __str__(self):
+        return self.value
+
+
 def key_case_conv(key, key_case: KeyCase):
     key = key.replace("&", "and")
     if key_case == KeyCase.SNAKE:
@@ -88,8 +103,8 @@ def key_case_conv(key, key_case: KeyCase):
 def get_args():
     case_serial = ", ".join([case.value for case in KeyCase])
     parser = argparse.ArgumentParser(
-        prog='claude_regexer.py',
-        description='Generate regex functions based upon sample data')
+        prog='scrape_anthropic_model_overview.py',
+        description='Scrape Anthropic\'s overview page of model metadata')
     parser.add_argument(
         '-u', '--url', action='store', default=MODELS_OVERVIEW_URL,
         dest='url', help='URL of Anthropic models overview page')
@@ -137,7 +152,7 @@ def extract_model_names_table(html_tree):
     return result
 
 
-def extract_model_aliases_table(html_tree, model_renames=None):
+def extract_model_aliases_table(html_tree):  # , model_renames=None):
     table = html_tree.xpath(TABLE_SEL.format(
         title_tag="h3", model_name="Model aliases"))[0]
     rows = table.xpath(".//tr")
@@ -146,10 +161,10 @@ def extract_model_aliases_table(html_tree, model_renames=None):
         cells = [td.text_content().strip() for td in row.xpath(".//td")]
         if not cells or len(cells) < 3:
             continue
-        if (model_key := cells[0]) and model_renames:
-            model_key = model_renames.get(model_key, {}).get("anthropic",
-                                                             model_key)
-        result[model_key] = {
+        # if (model_key := cells[0]) and model_renames:
+        #     model_key = model_renames.get(model_key, {}).get("anthropic",
+        #                                                      model_key)
+        result[cells[0]] = {
             "alias": cells[1],
             "model_id": cells[2],
         }
@@ -157,6 +172,7 @@ def extract_model_aliases_table(html_tree, model_renames=None):
 
 
 def extract_model_comparison_table(html_tree, key_case: KeyCase, model_renames=None):
+    # AKA Model Facts
     table = html_tree.xpath(TABLE_SEL.format(
         title_tag="h3", model_name="Model comparison table"))[0]
     rows = table.xpath(".//tr")
@@ -167,8 +183,9 @@ def extract_model_comparison_table(html_tree, key_case: KeyCase, model_renames=N
         info_kind = cells[0].strip()
         handler = COMP_CONVERSIONS.get(info_kind, lambda x: x)
         for model_nr, cell in enumerate(cells[1:]):
-            if (model_key := models[model_nr - 1]) and model_renames:
-                model_key = model_renames.get(model_key, {}).get("anthropic", model_key)
+            if (model_key := models[model_nr]) and model_renames:
+                model_key = model_renames.get(model_key,
+                                              {}).get("anthropic", model_key)
             result[model_key][key_case_conv(info_kind, key_case)] = handler(cell.strip())
 
     return result
@@ -192,6 +209,32 @@ def extract_model_pricing_table(html_tree, key_case: KeyCase, model_renames=None
     return result_reg
 
 
+def model_tag_to_name(model_names, aliases):
+    tag2name = dict()
+    for model_name, model_info in model_names.items():
+        for platform, model_id in model_info.items():
+            tag2name[model_id] = model_name
+    for alias, alias_info in aliases.items():
+        tag2name[alias_info["alias"]] = tag2name[alias_info["model_id"]]
+    return tag2name
+
+
+def combine_limits_and_pricing(model_names, pricing, comparison):
+    combined = {}
+    for model_key, model_info in model_names.items():
+        # Special case, where model_key is a tag with " v2" suffix,
+        # but referenced in other places without such as pricing
+        if model_key.endswith(" v2"):
+            model_key = model_key[:-3]
+        model_tag = model_info["anthropic"]
+        combined[model_key] = {
+            "pricing": pricing.get(model_tag),
+            "limits": {
+                "context_window": comparison[model_key]["context_window"],
+                "max_output": comparison[model_key]["max_output"],
+            },
+        }
+    return combined
 def fetch_and_parse_model_metadata(url,
                                    output_file=None,
                                    key_case: KeyCase=KeyCase.SNAKE,
@@ -204,14 +247,26 @@ def fetch_and_parse_model_metadata(url,
         html_tree = lxml.html.fromstring(response.content)
         model_names = extract_model_names_table(html_tree)
         model_renames = model_names if subst_id else None
+        aliases = extract_model_aliases_table(
+            html_tree)  # , model_renames=model_names)
+        tag2name = model_tag_to_name(model_names, aliases)
+        comparison = extract_model_comparison_table(
+                html_tree, key_case)  #, model_renames=model_names)
+        # latest = platform_by_name_by_latest(model_names, comparison)
+        pricing = extract_model_pricing_table(
+            html_tree, key_case, model_renames=model_names)
+        limits_and_pricing = combine_limits_and_pricing(model_names,
+                                                        pricing,
+                                                        comparison)
+        latest = None
         result = {
             "names": model_names,
-            "aliases": extract_model_aliases_table(
-                html_tree, model_renames=model_names),
-            "comparison": extract_model_comparison_table(
-                html_tree, key_case, model_renames=model_names),
-            "pricing": extract_model_pricing_table(
-                html_tree, key_case, model_renames=model_names),
+            "aliases": aliases,
+            "tag_to_name": tag2name,
+            "comparison": comparison,
+            # "latest": latest,
+            "pricing": pricing,
+            "limits_and_pricing": limits_and_pricing,
         }
         if output_file:
             with open(output_file, "w", encoding="utf-8") as f:

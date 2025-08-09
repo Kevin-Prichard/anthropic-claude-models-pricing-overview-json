@@ -135,3 +135,13 @@ ANTHROPIC_MODEL_PRICING_MTOK = {
 
 
 The growth of personal networks through Signal resistance groups is a good project
+
+Todo list:
+
+- Github page as CDN for generated JSON, Python, JS etc.
+  - scripts to generate and update that site repo
+- That same Github repo clonable
+- Pypi package for fetching the info from github page
+- Pypi package for the generator, separate
+- Never offer packages that include a static copy of the info
+
